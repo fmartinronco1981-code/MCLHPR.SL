@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión Inmobiliaria SL - Centro de Mando</title>
+    <!-- Tailwind CSS por CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans p-4 md:p-8">
+    <div class="max-w-7xl mx-auto space-y-8">
+        
+        <!-- Cabecera de la Sociedad -->
+        <header class="bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <div class="flex items-center gap-3">
+                    <h1 class="text-2xl md:text-3xl font-bold text-white tracking-tight">Inversiones Inmobiliarias SL</h1>
+                    <span class="bg-blue-500/10 text-blue-400 text-xs px-3 py-1 rounded-full border border-blue-500/20 font-medium">Modo Simulación / Teórico</span>
+                </div>
+                <p class="text-slate-400 text-sm mt-1">Cuadro de mando operativo y contable conectado a Supabase.</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="cargarDatos()" class="bg-slate-700 hover:bg-slate-600 text-white font-medium px-4 py-2.5 rounded-xl transition-all text-sm cursor-pointer">
+                    🔄 Sincronizar Datos
+                </button>
+                <button onclick="guardarCambiosPiso()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-5 py-2.5 rounded-xl shadow-lg transition-all transform active:scale-95 text-sm cursor-pointer">
+                    💾 Guardar Cambios
+                </button>
+            </div>
+        </header>
+
+        <!-- Tarjetas KPI Superiores (Resumen Global) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-slate-800 border border-slate-700 p-5 rounded-2xl shadow-lg">
+                <p class="text-sm font-medium text-slate-400">Ingresos Brutos (Alquiler)</p>
+                <p id="kpi-ingresos" class="text-2xl font-bold text-white mt-1">0 € <span class="text-xs font-normal text-slate-400">/mes</span></p>
+                <p id="kpi-habitaciones-count" class="text-xs text-emerald-400 mt-2">0 habitaciones activas</p>
+            </div>
+            
+            <div class="bg-slate-800 border border-slate-700 p-5 rounded-2xl shadow-lg">
+                <p class="text-sm font-medium text-slate-400">Gastos Totales (Piso + Hipoteca)</p>
+                <p id="kpi-gastos" class="text-2xl font-bold text-rose-400 mt-1">0 € <span class="text-xs font-normal text-slate-400">/mes</span></p>
+                <p id="kpi-gastos-detalle" class="text-xs text-slate-400 mt-2">Hipoteca + Fijos + Suministros</p>
+            </div>
+
+            <div class="bg-slate-800 border border-slate-700 p-5 rounded-2xl shadow-lg">
+                <p class="text-sm font-medium text-slate-400">Cashflow Neto Sociedad</p>
+                <p id="kpi-cashflow" class="text-2xl font-bold mt-1">0 € <span class="text-xs font-normal text-slate-400">/mes</span></p>
+                <p class="text-xs text-slate-400 mt-2">Beneficio real mensual tras gastos</p>
+            </div>
+
+            <div class="bg-slate-800 border border-slate-700 p-5 rounded-2xl shadow-lg">
+                <p class="text-sm font-medium text-slate-400">Rentabilidad Neta Activo</p>
+                <p id="kpi-rentabilidad" class="text-2xl font-bold text-indigo-400 mt-1">0.00%</p>
+                <p id="kpi-inversion-inicial" class="text-xs text-slate-400 mt-2">Capital inicial: 0 €</p>
+            </div>
+        </div>
+
+        <!-- Panel Central Editable (Piso y Habitaciones) -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Columna Izquierda: Configuración del Inmueble (Gastos y Financiación) -->
+            <div class="lg:col-span-2 bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-lg space-y-6">
+                <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+                    <h2 class="text-lg font-semibold text-white flex items-center gap-2">🏠 Datos del Inmueble y Costes Globales</h2>
+                    <span id="piso-nombre-header" class="text-xs bg-slate-700 text-slate-300 px-2.5 py-1 rounded-md font-mono">Cargando...</span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Compra e Hipoteca -->
+                    <div class="space-y-4 bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                        <h3 class="text-sm font-semibold text-blue-400 uppercase tracking-wider">Adquisición y Financiación</h3>
+                        
+                        <div>
+                            <label class="text-xs text-slate-300 block mb-1">Precio de Compra (€)</label>
+                            <input type="number" id="inp-precio" class="w-full bg-slate-900 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm font-mono focus:outline-none focus:border-blue-500" oninput="calcularTodo()">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-xs text-slate-300 block mb-1">% Hipoteca</label>
+                                <input type="number" id="inp-hipoteca-pct" class="w-full bg-slate-900 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm font-mono focus:outline-none focus:border-blue-500" oninput="calcularTodo()">
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-300 block mb-1">Cuota Hipoteca (€/mes)</label>
+                                <input type="number" id="inp-hipoteca-cuota" class="w-full bg-slate-900 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm font-mono focus:outline-none focus:border-blue-500" oninput="calcularTodo()">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Gastos Fijos y Suministros Desglosados -->
+                    <div class="space-y-4 bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                        <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Costes Operativos Mensuales/Anuales</h3>
+                        
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-xs text-slate-300 block mb-1">IBI Anual (€)</label>
+                                <input type="number" id="inp-ibi" class="w-full bg-slate-900 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm font-mono focus:outline-none focus:border-blue-500" oninput="calcularTodo()">
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-300 block mb-1">Comunidad (€/mes)</label>
+                                <input type="number" id="inp-comunidad" class="w-full bg-slate-900 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm font-mono focus:outline-none focus:border-blue-500" oninput="calcularTodo()">
+                            </div>
+                        </div>
+
+                        <!-- Suministros desglosados -->
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <label class="text-xs text-slate-300 block mb-1">Luz (€)</label>
+                                <input type="number" id="inp-luz" class="w-full bg-slate-900 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm font-mono focus:outline-none focus:border-blue-500" oninput="calcularTodo()">
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-300 block mb-1">Agua (€)</label>
+                                <input type="number" id="inp-agua" class="w-full bg-slate-900 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm font-mono focus:outline-none focus:border-blue-500" oninput="calcularTodo()">
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-300 block mb-1">Gas (€)</label>
+                                <input type="number" id="inp-gas" class="w-full bg-slate-900 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm font-mono focus:outline-none focus:border-blue-500" oninput="calcularTodo()">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-xs text-slate-300 block mb-1">Internet (€)</label>
+                                <input type="number" id="inp-internet" class="w-full bg-slate-900 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm font-mono focus:outline-none focus:border-blue-500" oninput="calcularTodo()">
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-300 block mb-1">Limpieza Z.C. (€)</label>
+                                <input type="number" id="inp-limpieza" class="w-full bg-slate-900 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm font-mono focus:outline-none focus:border-blue-500" oninput="calcularTodo()">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna Derecha: Habitaciones (Unidades de Ingreso) -->
+            <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-lg flex flex-col justify-between space-y-4">
+                <div>
+                    <div class="flex justify-between items-center border-b border-slate-700 pb-3 mb-4">
+                        <h2 class="text-lg font-semibold text-white">🚪 Habitaciones</h2>
+                        <button onclick="agregarHabitacionUI()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer">
+                            + Añadir
+                        </button>
+                    </div>
+                    
+                    <!-- Contenedor dinámico de habitaciones -->
+                    <div id="lista-habitaciones" class="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+                        <!-- Las habitaciones se inyectan aquí con JavaScript -->
+                    </div>
+                </div>
+
+                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700 text-xs text-slate-400 flex justify-between items-center">
+                    <span>Total Ingresos Brutos:</span>
+                    <span id="lbl-total-ingresos" class="text-white font-mono font-bold text-sm">0 € /mes</span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Script de Conexión a Supabase y Lógica Interactiva -->
+    <script>
+        // CONFIGURA TUS CREDENCIALES DE SUPABASE AQUÍ
+        const SUPABASE_URL = 'TU_SUPABASE_URL_AQUÍ';
+        const SUPABASE_ANON_KEY = 'TU_SUPABASE_ANON_KEY_AQUÍ';
+        
+        // Inicializar cliente Supabase (si las credenciales no están puestas, funciona en modo local temporal)
+        let supabaseClient = null;
+        try {
+            if (SUPABASE_URL !== 'TU_SUPABASE_URL_AQUÍ') {
+                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            }
+        } catch (e) {
+            console.warn("Supabase no configurado todavía, operando en modo local.");
+        }
+
+        // Estado en memoria de la aplicación
+        let pisoActual = {
+            id: null,
+            nombre: "Piso Ejemplo Madrid",
+            precio_compra: 220000,
+            gastos_compra_pct: 10,
+            hipoteca_capital: 176000,
+            hipoteca_cuota_mes: 790,
+            ibi_anual: 400,
+            comunidad_mes: 60,
+            seguro_anual: 250,
+            luz_mes: 70,
+            agua_mes: 35,
+            gas_mes: 30,
+            internet_mes: 30,
+            limpieza_mes: 50,
+            vacancia_pct: 5
+        };
+
+        let habitacionesActuales = [
+            { id: '1', nombre: 'Habitación 1 (Suite)', renta_mensual: 600, estado: 'Disponible' },
+            { id: '2', nombre: 'Habitación 2', renta_mensual: 520, estado: 'Disponible' }
+        ];
+
+        // Al cargar la página, inyectar valores en los inputs
+        window.addEventListener('DOMContentLoaded', () => {
+            if (supabaseClient) {
+                cargarDatos();
+            } else {
+                sincronizarInputsConEstado();
+                calcularTodo();
+            }
+        });
+
+        async function cargarDatos() {
+            if (!supabaseClient) return;
+            try {
+                // Cargar primer piso
+                let { data: pisos, error } = await supabaseClient.from('pisos').select('*').limit(1);
+                if (pisos && pisos.length > 0) {
+                    pisoActual = pisos[0];
+                    // Cargar habitaciones de este piso
+                    let { data: habs } = await supabaseClient.from('habitaciones').select('*').eq('piso_id', pisoActual.id);
+                    if (habs) habitacionesActuales = habs;
+                } else {
+                    // Si no hay pisos en Supabase, creamos uno por defecto
+                    await guardarCambiosPiso();
+                }
+                sincronizarInputsConEstado();
+                calcularTodo();
+            } catch (err) {
+                console.error("Error al conectar con Supabase:", err);
+            }
+        }
+
+        function sincronizarInputsConEstado() {
+            document.getElementById('piso-nombre-header').innerText = pisoActual.nombre;
+            document.getElementById('inp-precio').value = pisoActual.precio_compra;
+            document.getElementById('inp-hipoteca-pct').value = pisoActual.hipoteca_capital && pisoActual.precio_compra ? Math.round((pisoActual.hipoteca_capital / pisoActual.precio_compra) * 100) : 80;
+            document.getElementById('inp-hipoteca-cuota').value = pisoActual.hipoteca_cuota_mes;
+            document.getElementById('inp-ibi').value = pisoActual.ibi_anual;
+            document.getElementById('inp-comunidad').value = pisoActual.comunidad_mes;
+            document.getElementById('inp-luz').value = pisoActual.luz_mes;
+            document.getElementById('inp-agua').value = pisoActual.agua_mes;
+            document.getElementById('inp-gas').value = pisoActual.gas_mes;
+            document.getElementById('inp-internet').value = pisoActual.internet_mes;
+            document.getElementById('inp-limpieza').value = pisoActual.limpieza_mes;
+            
+            renderizarHabitaciones();
+        }
+
+        function leerInputsAEstado() {
+            pisoActual.precio_compra = parseFloat(document.getElementById('inp-precio').value) || 0;
+            const hipotecaPct = parseFloat(document.getElementById('inp-hipoteca-pct').value) || 0;
+            pisoActual.hipoteca_capital = (pisoActual.precio_compra * hipotecaPct) / 100;
+            pisoActual.hipoteca_cuota_mes = parseFloat(document.getElementById('inp-hipoteca-cuota').value) || 0;
+            pisoActual.ibi_anual = parseFloat(document.getElementById('inp-ibi').value) || 0;
+            pisoActual.comunidad_mes = parseFloat(document.getElementById('inp-comunidad').value) || 0;
+            pisoActual.luz_mes = parseFloat(document.getElementById('inp-luz').value) || 0;
+            pisoActual.agua_mes = parseFloat(document.getElementById('inp-agua').value) || 0;
+            pisoActual.gas_mes = parseFloat(document.getElementById('inp-gas').value) || 0;
+            pisoActual.internet_mes = parseFloat(document.getElementById('inp-internet').value) || 0;
+            pisoActual.limpieza_mes = parseFloat(document.getElementById('inp-limpieza').value) || 0;
+        }
+
+        function renderizarHabitaciones() {
+            const container = document.getElementById('lista-habitaciones');
+            container.innerHTML = '';
+            
+            habitacionesActuales.forEach((hab, index) => {
+                const div = document.createElement('div');
+                div.className = "bg-slate-900/60 border border-slate-700/60 p-3 rounded-xl flex items-center justify-between gap-3";
+                div.innerHTML = `
+                    <div class="flex-1 space-y-1">
+                        <input type="text" value="${hab.nombre}" onchange="actualizarHabitacion(${index}, 'nombre', this.value)" class="bg-transparent text-white font-medium text-sm w-full focus:outline-none border-b border-transparent focus:border-blue-500">
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="relative">
+                            <input type="number" value="${hab.renta_mensual}" onchange="actualizarHabitacion(${index}, 'renta_mensual', this.value)" class="bg-slate-800 text-white font-mono text-xs px-2 py-1.5 rounded-lg w-20 text-right border border-slate-700 focus:outline-none focus:border-blue-500">
+                            <span class="absolute right-1 top-1 text-[10px] text-slate-500 pointer-events-none">€</span>
+                        </div>
+                        <button onclick="eliminarHabitacion(${index})" class="text-rose-400 hover:text-rose-300 p-1 text-xs cursor-pointer" title="Eliminar">✕</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function actualizarHabitacion(index, campo, valor) {
+            if (campo === 'renta_mensual') {
+                habitacionesActuales[index][campo] = parseFloat(valor) || 0;
+            } else {
+                habitacionesActuales[index][campo] = valor;
+            }
+            calcularTodo();
+        }
+
+        function agregarHabitacionUI() {
+            habitacionesActuales.push({
+                id: 'temp_' + Date.now(),
+                nombre: `Habitación ${habitacionesActuales.length + 1}`,
+                renta_mensual: 500,
+                estado: 'Disponible'
+            });
+            renderizarHabitaciones();
+            calcularTodo();
+        }
+
+        function eliminarHabitacion(index) {
+            habitacionesActuales.splice(index, 1);
+            renderizarHabitaciones();
+            calcularTodo();
+        }
+
+        function calcularTodo() {
+            leerInputsAEstado();
+
+            // Calcular ingresos
+            let totalIngresos = habitacionesActuales.reduce((acc, h) => acc + (parseFloat(h.renta_mensual) || 0), 0);
+            
+            // Calcular gastos mensuales
+            const ibiMensual = pisoActual.ibi_anual / 12;
+            const seguroMensual = 20; // Estimado anual repartido
+            const totalSuministros = pisoActual.luz_mes + pisoActual.agua_mes + pisoActual.gas_mes + pisoActual.internet_mes + pisoActual.limpieza_mes;
+            const totalGastosFijos = ibiMensual + pisoActual.comunidad_mes + seguroMensual + totalSuministros;
+            const totalGastosMensuales = pisoActual.hipoteca_cuota_mes + totalGastosFijos;
+
+            // Cashflow
+            const cashflowMensual = totalIngresos - totalGastosMensuales;
+            const cashflowAnual = cashflowMensual * 12;
+
+            // Rentabilidad Neta
+            const gastosCompra = pisoActual.precio_compra * (pisoActual.gastos_compra_pct / 100);
+            const capitalInicial = (pisoActual.precio_compra - pisoActual.hipoteca_capital) + gastosCompra;
+            const netOperatingIncome = (totalIngresos * 12) - (totalGastosFijos * 12);
+            const rentabilidadNeta = pisoActual.precio_compra > 0 ? (netOperatingIncome / pisoActual.precio_compra) * 100 : 0;
+
+            // Actualizar interfaz visual
+            document.getElementById('kpi-ingresos').innerHTML = `${totalIngresos.toLocaleString()} € <span class="text-xs font-normal text-slate-400">/mes</span>`;
+            document.getElementById('kpi-habitaciones-count').innerText = `${habitacionesActuales.length} habitaciones en alquiler`;
+
+            document.getElementById('kpi-gastos').innerHTML = `${Math.round(totalGastosMensuales).toLocaleString()} € <span class="text-xs font-normal text-slate-400">/mes</span>`;
+            document.getElementById('kpi-gastos-detalle').innerText = `Hipoteca (${pisoActual.hipoteca_cuota_mes}€) + Fijos/Sum (${Math.round(totalGastosFijos)}€)`;
+
+            const cfElem = document.getElementById('kpi-cashflow');
+            cfElem.innerHTML = `${Math.round(cashflowMensual).toLocaleString()} € <span class="text-xs font-normal text-slate-400">/mes</span>`;
+            cfElem.className = `text-2xl font-bold mt-1 ${cashflowMensual >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+
+            document.getElementById('kpi-rentabilidad').innerText = rentabilidadNeta.toFixed(2) + '%';
+            document.getElementById('kpi-inversion-inicial').innerText = `Capital inicial aprox: ${Math.round(capitalInicial).toLocaleString()} €`;
+            document.getElementById('lbl-total-ingresos').innerText = `${totalIngresos.toLocaleString()} € /mes`;
+        }
+
+        async function guardarCambiosPiso() {
+            leerInputsAEstado();
+            
+            if (!supabaseClient) {
+                alert("Simulación guardada en memoria local. Conecta tus credenciales de Supabase en el código para persistirlo en la nube.");
+                return;
+            }
+
+            try {
+                // Guardar o actualizar piso en Supabase
+                if (!pisoActual.id) {
+                    let { data, error } = await supabaseClient.from('pisos').insert([pisoActual]).select();
+                    if (data && data.length > 0) pisoActual.id = data[0].id;
+                } else {
+                    await supabaseClient.from('pisos').update(pisoActual).eq('id', pisoActual.id);
+                }
+
+                alert("¡Datos del piso guardados correctamente en Supabase!");
+            } catch (err) {
+                console.error("Error al guardar en Supabase:", err);
+                alert("Error al guardar los datos.");
+            }
+        }
+    </script>
+</body>
+</html>
